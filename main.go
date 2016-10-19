@@ -58,7 +58,7 @@ func main() {
 					return
 				}
 			}
-			definition, audio, err := googleDefinition(cache, word)
+			definition, err := googleDefinition(cache, word)
 			if err != nil {
 				if debug {
 					w.Write([]byte(err.Error()))
@@ -85,6 +85,8 @@ func main() {
 			w.Write([]byte("<h1>" + word + "</h1>"))
 
 			// Audio
+			audio, _ := audioURL(word)
+			fmt.Println(audio)
 			w.Write([]byte(fmt.Sprintf(`
 				<div><audio controls>
 				  <source src="%s" type="audio/mpeg">
@@ -136,28 +138,31 @@ func googleImages(client Getter, word string) ([]string, error) {
 	return images, nil
 }
 
-func googleDefinition(client Getter, word string) (def, audio string, err error) {
+func googleDefinition(client Getter, word string) (string, error) {
 	var (
 		Class = expr.Class
 	)
 	req, err := http.NewRequest("GET", "https://www.google.com/search?gws_rd=cr,ssl&hl=en&q=define%3A"+word, nil)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	req.Header.Set("User-Agent", `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.59 Safari/537.36`)
 	body, err := client.Get(req)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	root, err := query.Parse(bytes.NewReader(body))
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	dict := root.Div(Class("lr_dct_ent"))
+	def := ""
 	if dictHTML := dict.Render(); dictHTML != nil {
-		if audioLink := dict.Audio().Src(); audioLink != nil {
-			audio = *audioLink
-		}
+		/*
+			if audioLink := dict.Audio().Src(); audioLink != nil {
+				audio = *audioLink
+			}
+		*/
 		def = *dictHTML
 	}
 	if def == "" {
@@ -165,10 +170,10 @@ func googleDefinition(client Getter, word string) (def, audio string, err error)
 		if page := root.Render(); page != nil {
 			err = errors.New(*page)
 		}
-		return "", "", err
+		return "", err
 
 	}
-	return
+	return def, nil
 }
 
 var rxSpace = regexp.MustCompile(`[\t \r\n!()\[\]\{\};:",<.>?“”‘’*/]+`)
