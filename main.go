@@ -86,7 +86,6 @@ func main() {
 
 			// Audio
 			audio, _ := audioURL(word)
-			fmt.Println(audio)
 			w.Write([]byte(fmt.Sprintf(`
 				<div><audio controls>
 				  <source src="%s" type="audio/mpeg">

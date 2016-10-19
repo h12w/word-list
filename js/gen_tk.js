@@ -2,7 +2,11 @@
 
 // TODO: get TKK from https://translate.google.com/
 
-TKK=eval('((function(){var a\x3d1944843558;var b\x3d2099926662;return 410250+\x27.\x27+(a+b)})())');
+//TKK=eval('((function(){var a\x3d1944843558;var b\x3d2099926662;return 410250+\x27.\x27+(a+b)})())');
+
+var TKK = function(x,a,b) {
+    return x+'.'+(a+b);
+}
 
 var fj = function(a) {
         return function() {
@@ -20,7 +24,7 @@ var fj = function(a) {
         return a
     },
 
-    ij = function(a) {
+    ij = function(a,tkkx,tkka,tkkb) {
         var b;
         if (null !== hj) b = hj;
         else {
@@ -28,7 +32,7 @@ var fj = function(a) {
             var c = fj(String.fromCharCode(75));
             b = [b(), b()];
             b[1] = c();
-            b = (hj = TKK || "") || ""
+            b = (hj = TKK(tkkx,tkka,tkkb) || "") || ""
         }
         var d = fj(String.fromCharCode(116)),
             c = fj(String.fromCharCode(107)),
@@ -52,6 +56,6 @@ var fj = function(a) {
             (a ^ b))
     };
 
-if (process.argv.length === 3) {
-	console.log(ij(process.argv[2]));
+if (process.argv.length === 6) {
+	console.log(ij(process.argv[2],parseInt(process.argv[3]),parseInt(process.argv[4]),parseInt(process.argv[5])));
 }
