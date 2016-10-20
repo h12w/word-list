@@ -10,11 +10,21 @@ import (
 	"regexp"
 )
 
-func audioURL(text string) (string, error) {
+// word audio link:
+// https://ssl.gstatic.com/dictionary/static/sounds/de/0/survey.mp3
+
+func youdaoAudio(text string) (string, error) {
 	return fmt.Sprintf(`http://dict.youdao.com/dictvoice?audio=%s&type=2`, text), nil
 }
 
 func googleAudioURL(text string) (string, error) {
+	return fmt.Sprintf(
+		`https://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&client=tw-ob&q=%s&tl=en_US`,
+		text,
+	), nil
+}
+
+func googleSignedAudioURL(text string) (string, error) {
 	tk, err := getTTSToken(text)
 	if err != nil {
 		return "", err

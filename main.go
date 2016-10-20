@@ -4,15 +4,32 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"h12.me/html-query"
 	"h12.me/html-query/expr"
+)
+
+var (
+	client = http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
 )
 
 func main() {
@@ -85,7 +102,7 @@ func main() {
 			w.Write([]byte("<h1>" + word + "</h1>"))
 
 			// Audio
-			audio, _ := audioURL(word)
+			audio := `/tts?q=` + word
 			w.Write([]byte(fmt.Sprintf(`
 				<div><audio controls>
 				  <source src="%s" type="audio/mpeg">
@@ -103,6 +120,26 @@ func main() {
 			w.Write([]byte("</body></html>"))
 		}
 
+	})
+
+	http.HandleFunc("/tts", func(w http.ResponseWriter, r *http.Request) {
+		word := r.URL.Query().Get("q")
+		uri, _ := googleAudioURL(word)
+		req, err := http.NewRequest("GET", uri, nil)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		req.Header.Set("User-Agent", `Mozilla/5.0 (Android 4.4; Mobile; rv:41.0) Gecko/41.0 Firefox/41.0`)
+		req.Header.Set("Referer", "http://translate.google.com/")
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		defer resp.Body.Close()
+		w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
+		io.Copy(w, resp.Body)
 	})
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -189,10 +226,6 @@ func splitWords(s string) []string {
 	}
 	return words
 }
-
-var (
-	client = http.Client{}
-)
 
 type cache struct {
 	m map[string][]byte
