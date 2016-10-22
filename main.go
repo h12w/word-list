@@ -10,7 +10,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
+	"golang.org/x/sync/errgroup"
 	"h12.me/html-query"
 	"h12.me/html-query/expr"
 )
@@ -39,6 +41,7 @@ func main() {
 			wordParams := strings.Join(words, ".")
 			uri := "/word/?w=" + wordParams
 			http.Redirect(w, r, uri, http.StatusFound)
+			go prefetch(cache, words)
 		}
 	})
 	http.HandleFunc("/word/", func(w http.ResponseWriter, r *http.Request) {
@@ -182,6 +185,9 @@ func splitWords(s string) []string {
 	m := make(map[string]bool)
 	var results []string
 	for _, word := range words {
+		if word == "" {
+			continue
+		}
 		if _, exists := m[word]; !exists {
 			m[word] = true
 			results = append(results, word)
@@ -195,7 +201,8 @@ var (
 )
 
 type cache struct {
-	m map[string][]byte
+	m  map[string][]byte
+	mu sync.RWMutex
 }
 
 func newCache() *cache {
@@ -210,9 +217,14 @@ type Getter interface {
 
 func (c *cache) Get(req *http.Request) ([]byte, error) {
 	uri := req.URL.String()
+
+	c.mu.RLock()
 	if body, ok := c.m[uri]; ok {
+		c.mu.RUnlock()
 		return body, nil
 	}
+	c.mu.RUnlock()
+
 	req.Header.Set("Accept", `text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8`)
 	req.Header.Set("Accept-Language", "en-US,en")
 	resp, err := client.Do(req)
@@ -224,6 +236,27 @@ func (c *cache) Get(req *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.m[req.URL.String()] = body
+
+	c.mu.Lock()
+	c.m[uri] = body
+	c.mu.Unlock()
+
 	return body, nil
+}
+
+func prefetch(cache Getter, words []string) error {
+	var g errgroup.Group
+	for _, word := range words {
+		word := word
+		g.Go(func() error {
+			if _, err := googleDefinition(cache, word); err != nil {
+				return err
+			}
+			if _, err := googleImages(cache, word); err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+	return g.Wait()
 }
