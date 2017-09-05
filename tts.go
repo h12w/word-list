@@ -44,7 +44,7 @@ func getTKK() (x, a, b string, err error) {
 	if err != nil {
 		return "", "", "", err
 	}
-	req.Header.Set("User-Agent", `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.59 Safari/537.36`)
+	req.Header.Set("User-Agent", ua)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", "", "", err

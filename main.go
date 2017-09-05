@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -15,23 +14,23 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
 	"h12.me/html-query"
 	"h12.me/html-query/expr"
+	"h12.me/socks"
 )
 
 var (
 	client = http.Client{
 		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).Dial,
+			Dial:                  socks.DialSocksProxy(socks.SOCKS5, "127.0.0.1:1080"),
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		},
 	}
+)
+
+const (
+	ua = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.59 Safari/537.36`
 )
 
 func main() {
@@ -133,7 +132,7 @@ func main() {
 			log.Println(err)
 			return
 		}
-		req.Header.Set("User-Agent", `Mozilla/5.0 (Android 4.4; Mobile; rv:41.0) Gecko/41.0 Firefox/41.0`)
+		req.Header.Set("User-Agent", ua)
 		req.Header.Set("Referer", "http://translate.google.com/")
 		resp, err := client.Do(req)
 		if err != nil {
@@ -157,7 +156,7 @@ func googleImages(client Getter, word string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", `Mozilla/5.0 (Android 4.4; Mobile; rv:41.0) Gecko/41.0 Firefox/41.0`)
+	req.Header.Set("User-Agent", ua)
 	body, err := client.Get(req)
 	if err != nil {
 		return nil, err
@@ -185,7 +184,7 @@ func googleDefinition(client Getter, word string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.59 Safari/537.36`)
+	req.Header.Set("User-Agent", ua)
 	body, err := client.Get(req)
 	if err != nil {
 		return "", err
@@ -206,9 +205,9 @@ func googleDefinition(client Getter, word string) (string, error) {
 	}
 	if def == "" {
 		err := errors.New("cannot find definition")
-		if page := root.Render(); page != nil {
-			err = errors.New(*page)
-		}
+		// if page := root.Render(); page != nil {
+		// err = errors.New(*page)
+		// }
 		return "", err
 
 	}
@@ -278,18 +277,14 @@ func (c *cache) Get(req *http.Request) ([]byte, error) {
 }
 
 func prefetch(cache Getter, words []string) error {
-	var g errgroup.Group
 	for _, word := range words {
-		word := word
-		g.Go(func() error {
-			if _, err := googleDefinition(cache, word); err != nil {
-				return err
-			}
-			if _, err := googleImages(cache, word); err != nil {
-				return err
-			}
-			return nil
-		})
+		if _, err := googleDefinition(cache, word); err != nil {
+			log.Print(err)
+		}
+		if _, err := googleImages(cache, word); err != nil {
+			log.Print(err)
+		}
+		time.Sleep(time.Second)
 	}
-	return g.Wait()
+	return nil
 }
